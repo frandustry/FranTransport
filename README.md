@@ -27,16 +27,19 @@ multi-tenant service.
 ## Build and test
 
 ```sh
-go build ./cmd/frantransport-controlplane ./cmd/frantransportd
-go test ./...
-go test -race ./...
+make build
+make check
 ```
+
+Run `make help` for individual formatting, vet, test, race, run, and cleanup
+targets. The equivalent direct Go commands remain available when Make is not
+installed.
 
 The public-DERP Tailcat contract test is opt-in because it performs real
 network I/O:
 
 ```sh
-FRANTRANSPORT_TAILCAT_INTEGRATION=1 go test ./pkg/transport/tailcat -run TestContract -v
+make tailcat-integration
 ```
 
 ## Local demo
