@@ -27,6 +27,11 @@ go.work.sum
 # env file
 .env
 
+# Local FranTransport runtime state
+frantransport.db
+frantransport.db-shm
+frantransport.db-wal
+
 # Editor/IDE
 # .idea/
 # .vscode/

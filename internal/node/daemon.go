@@ -81,7 +81,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		_ = d.cfg.ControlPlane.Offline(shutdownCtx)
+		if err := d.cfg.ControlPlane.Offline(shutdownCtx); err != nil {
+			d.cfg.Logger.Warn("offline update failed", "error", err)
+		}
 		if d.server != nil {
 			_ = d.server.Shutdown(shutdownCtx)
 		}
@@ -207,28 +209,37 @@ func (d *Daemon) connect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "peer_id is required", 400)
 		return
 	}
-	d.setPeer(req.PeerID, abstraction.StateConnecting)
-	conn, err := d.client.Connect(r.Context(), req.PeerID)
+	payload, info, err := d.Exchange(r.Context(), req.PeerID, req.Payload)
 	if err != nil {
-		d.setPeer(req.PeerID, abstraction.StateFailed)
 		http.Error(w, err.Error(), 502)
 		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"payload": payload, "connection": info})
+}
+
+// Exchange connects to a peer, sends one payload, and waits for one reply.
+// It is the daemon's minimal V1 data-plane operation and never uses the control
+// plane for payload delivery.
+func (d *Daemon) Exchange(ctx context.Context, peerID abstraction.PeerID, payload []byte) ([]byte, abstraction.ConnectionInfo, error) {
+	d.setPeer(peerID, abstraction.StateConnecting)
+	conn, err := d.client.Connect(ctx, peerID)
+	if err != nil {
+		d.setPeer(peerID, abstraction.StateFailed)
+		return nil, abstraction.ConnectionInfo{PeerID: peerID, State: abstraction.StateFailed, Path: abstraction.PathUnknown}, err
 	}
 	defer conn.Close()
-	if err := conn.Send(r.Context(), req.Payload); err != nil {
-		d.setPeer(req.PeerID, abstraction.StateFailed)
-		http.Error(w, err.Error(), 502)
-		return
+	if err := conn.Send(ctx, payload); err != nil {
+		d.setPeer(peerID, abstraction.StateFailed)
+		return nil, conn.Info(), err
 	}
-	payload, err := conn.Receive(r.Context())
+	reply, err := conn.Receive(ctx)
 	if err != nil {
-		d.setPeer(req.PeerID, abstraction.StateFailed)
-		http.Error(w, err.Error(), 502)
-		return
+		d.setPeer(peerID, abstraction.StateFailed)
+		return nil, conn.Info(), err
 	}
-	d.setPeer(req.PeerID, abstraction.StateConnected)
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"payload": payload, "connection": conn.Info()})
+	d.setPeer(peerID, abstraction.StateConnected)
+	return reply, conn.Info(), nil
 }
 
 func (d *Daemon) setPeer(id abstraction.PeerID, state abstraction.ConnectionState) {

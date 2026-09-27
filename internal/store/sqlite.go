@@ -40,6 +40,11 @@ func OpenSQLite(path string) (*SQLite, error) {
 	if err != nil {
 		return nil, err
 	}
+	// V1 uses a single local SQLite writer. Serializing through one connection
+	// avoids transient SQLITE_BUSY failures during simultaneous heartbeats and
+	// graceful shutdown updates.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	s := &SQLite{db: db, now: time.Now}
 	if err := s.init(context.Background()); err != nil {
 		_ = db.Close()

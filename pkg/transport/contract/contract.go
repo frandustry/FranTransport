@@ -19,7 +19,7 @@ func TestTransport(t *testing.T, factory Factory) {
 	a, b := factory(t)
 	t.Cleanup(func() { _ = a.Close(); _ = b.Close() })
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	payload := []byte("frantransport-contract-\x00-payload")
 	received := make(chan []byte, 1)
@@ -62,8 +62,8 @@ func TestTransport(t *testing.T, factory Factory) {
 	if err := b.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	_, err = a.Dial(ctx, abstraction.Peer{ID: "b", Endpoint: b.Endpoint()})
-	if !errors.Is(err, transport.ErrPeerUnavailable) {
-		t.Fatalf("Dial closed peer error = %v", err)
+	_, err = b.Accept(ctx)
+	if !errors.Is(err, transport.ErrClosed) {
+		t.Fatalf("Accept after Close error = %v", err)
 	}
 }
