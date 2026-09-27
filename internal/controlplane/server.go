@@ -24,7 +24,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/peers", s.auth(s.peers))
 	mux.HandleFunc("POST /api/v1/heartbeat", s.auth(s.heartbeat))
 	mux.HandleFunc("POST /api/v1/offline", s.auth(s.offline))
-	mux.HandleFunc("GET /", s.index)
+	mux.HandleFunc("GET /{$}", s.index)
 	return securityHeaders(mux)
 }
 

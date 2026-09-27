@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/netip"
+	"os"
 	"time"
 
 	"github.com/frandustry/FranTransport/internal/controlplane"
@@ -23,6 +24,18 @@ type SQLite struct {
 }
 
 func OpenSQLite(path string) (*SQLite, error) {
+	if path != ":memory:" {
+		f, err := os.OpenFile(path, os.O_CREATE, 0o600)
+		if err != nil {
+			return nil, err
+		}
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
+		if err := os.Chmod(path, 0o600); err != nil {
+			return nil, err
+		}
+	}
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
